@@ -382,6 +382,7 @@ cpack_set_if_not_set(CPACK_PACKAGE_INSTALL_REGISTRY_KEY
   "${CPACK_PACKAGE_INSTALL_DIRECTORY}")
 cpack_set_if_not_set(CPACK_PACKAGE_DEFAULT_LOCATION "/")
 cpack_set_if_not_set(CPACK_PACKAGE_RELOCATABLE "true")
+cpack_set_if_not_set(CPACK_UNINSTALL_NAME "Uninstall")
 
 # always force to exactly "true" or "false" for CPack.Info.plist.in:
 if(CPACK_PACKAGE_RELOCATABLE)

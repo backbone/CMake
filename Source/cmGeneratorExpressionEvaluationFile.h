@@ -34,6 +34,7 @@ public:
   void CreateOutputFile(std::string const& config);
 
 private:
+  typedef unsigned short mode_t;
   void Generate(const std::string& config,
               cmCompiledGeneratorExpression* inputExpression,
               std::map<std::string, std::string> &outputFiles, mode_t perm);

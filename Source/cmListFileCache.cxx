@@ -12,7 +12,7 @@
 #include "cmListFileCache.h"
 
 #include "cmListFileLexer.h"
-#include "cmLocalGenerator.h"
+#include "cmOutputConverter.h"
 #include "cmSystemTools.h"
 #include "cmMakefile.h"
 #include "cmVersion.h"
@@ -396,6 +396,21 @@ bool cmListFileParser::AddArgument(cmListFileLexer_Token* token,
     this->Makefile->IssueMessage(cmake::AUTHOR_WARNING, m.str());
     return true;
     }
+}
+
+cmListFileBacktrace::cmListFileBacktrace(cmState::Snapshot snapshot,
+                                         cmCommandContext const& cc)
+  : Context(cc)
+  , Snapshot(snapshot)
+{
+  if (this->Snapshot.IsValid())
+    {
+    this->Snapshot.Keep();
+    }
+}
+
+cmListFileBacktrace::~cmListFileBacktrace()
+{
 }
 
 void cmListFileBacktrace::PrintTitle(std::ostream& out) const

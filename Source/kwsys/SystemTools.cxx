@@ -1366,15 +1366,18 @@ bool SystemTools::Touch(const std::string& filename, bool create)
   struct timeval mtime;
   gettimeofday(&mtime, 0);
 # if KWSYS_CXX_HAS_UTIMES
-  struct timeval times[2] =
-    {
-#  if KWSYS_STAT_HAS_ST_MTIM
-      {st.st_atim.tv_sec, st.st_atim.tv_nsec/1000}, /* tv_sec, tv_usec */
+  struct timeval atime;
+#  if KWSYS_CXX_STAT_HAS_ST_MTIM
+  atime.tv_sec = st.st_atim.tv_sec;
+  atime.tv_usec = st.st_atim.tv_nsec/1000;
+#  elif KWSYS_CXX_STAT_HAS_ST_MTIMESPEC
+  atime.tv_sec = st.st_atimespec.tv_sec;
+  atime.tv_usec = st.st_atimespec.tv_nsec/1000;
 #  else
-      {st.st_atime, 0},
+  atime.tv_sec = st.st_atime;
+  atime.tv_usec = 0;
 #  endif
-      mtime
-    };
+  struct timeval times[2] = { atime, mtime };
   if(utimes(filename.c_str(), times) < 0)
     {
     return false;
@@ -1408,7 +1411,7 @@ bool SystemTools::FileTimeCompare(const std::string& f1,
     {
     return false;
     }
-# if KWSYS_STAT_HAS_ST_MTIM
+# if KWSYS_CXX_STAT_HAS_ST_MTIM
   // Compare using nanosecond resolution.
   if(s1.st_mtim.tv_sec < s2.st_mtim.tv_sec)
     {
@@ -1423,6 +1426,24 @@ bool SystemTools::FileTimeCompare(const std::string& f1,
     *result = -1;
     }
   else if(s1.st_mtim.tv_nsec > s2.st_mtim.tv_nsec)
+    {
+    *result = 1;
+    }
+# elif KWSYS_CXX_STAT_HAS_ST_MTIMESPEC
+  // Compare using nanosecond resolution.
+  if(s1.st_mtimespec.tv_sec < s2.st_mtimespec.tv_sec)
+    {
+    *result = -1;
+    }
+  else if(s1.st_mtimespec.tv_sec > s2.st_mtimespec.tv_sec)
+    {
+    *result = 1;
+    }
+  else if(s1.st_mtimespec.tv_nsec < s2.st_mtimespec.tv_nsec)
+    {
+    *result = -1;
+    }
+  else if(s1.st_mtimespec.tv_nsec > s2.st_mtimespec.tv_nsec)
     {
     *result = 1;
     }
@@ -2949,6 +2970,8 @@ std::string SystemTools::FindProgram(
   bool no_system_path)
 {
   std::vector<std::string> extensions;
+  std::string tryPath;
+
 #if defined (_WIN32) || defined(__CYGWIN__) || defined(__MINGW32__)
   bool hasExtension = false;
   // check to see if the name already has a .xxx at
@@ -2962,22 +2985,22 @@ std::string SystemTools::FindProgram(
     {
     extensions.push_back(".com");
     extensions.push_back(".exe");
-    }
-#endif
-  std::string tryPath;
 
-  // first try with extensions if the os supports them
-  for(std::vector<std::string>::iterator i =
-        extensions.begin(); i != extensions.end(); ++i)
-    {
-    tryPath = name;
-    tryPath += *i;
-    if(SystemTools::FileExists(tryPath) &&
-        !SystemTools::FileIsDirectory(tryPath))
+    // first try with extensions if the os supports them
+    for(std::vector<std::string>::iterator i =
+          extensions.begin(); i != extensions.end(); ++i)
       {
-      return SystemTools::CollapseFullPath(tryPath);
+      tryPath = name;
+      tryPath += *i;
+      if(SystemTools::FileExists(tryPath) &&
+          !SystemTools::FileIsDirectory(tryPath))
+        {
+        return SystemTools::CollapseFullPath(tryPath);
+        }
       }
     }
+#endif
+
   // now try just the name
   tryPath = name;
   if(SystemTools::FileExists(tryPath) &&
@@ -3027,8 +3050,7 @@ std::string SystemTools::FindProgram(
       tryPath = *p;
       tryPath += name;
       tryPath += *ext;
-      if(SystemTools::FileExists(tryPath) &&
-          !SystemTools::FileIsDirectory(tryPath))
+      if(SystemTools::FileExists(tryPath, true))
         {
         return SystemTools::CollapseFullPath(tryPath);
         }
@@ -3036,8 +3058,7 @@ std::string SystemTools::FindProgram(
     // now try it without them
     tryPath = *p;
     tryPath += name;
-    if(SystemTools::FileExists(tryPath) &&
-       !SystemTools::FileIsDirectory(tryPath))
+    if(SystemTools::FileExists(tryPath, true))
       {
       return SystemTools::CollapseFullPath(tryPath);
       }
@@ -3076,8 +3097,7 @@ std::string SystemTools
               const std::vector<std::string>& userPaths)
 {
   // See if the executable exists as written.
-  if(SystemTools::FileExists(name) &&
-     !SystemTools::FileIsDirectory(name))
+  if(SystemTools::FileExists(name, true))
     {
     return SystemTools::CollapseFullPath(name);
     }
@@ -3123,8 +3143,7 @@ std::string SystemTools
     tryPath = *p;
     tryPath += name;
     tryPath += ".lib";
-    if(SystemTools::FileExists(tryPath)
-       && !SystemTools::FileIsDirectory(tryPath))
+    if(SystemTools::FileExists(tryPath, true))
       {
       return SystemTools::CollapseFullPath(tryPath);
       }
@@ -3133,8 +3152,7 @@ std::string SystemTools
     tryPath += "lib";
     tryPath += name;
     tryPath += ".so";
-    if(SystemTools::FileExists(tryPath)
-       && !SystemTools::FileIsDirectory(tryPath))
+    if(SystemTools::FileExists(tryPath, true))
       {
       return SystemTools::CollapseFullPath(tryPath);
       }
@@ -3142,8 +3160,7 @@ std::string SystemTools
     tryPath += "lib";
     tryPath += name;
     tryPath += ".a";
-    if(SystemTools::FileExists(tryPath)
-       && !SystemTools::FileIsDirectory(tryPath))
+    if(SystemTools::FileExists(tryPath, true))
       {
       return SystemTools::CollapseFullPath(tryPath);
       }
@@ -3151,8 +3168,7 @@ std::string SystemTools
     tryPath += "lib";
     tryPath += name;
     tryPath += ".sl";
-    if(SystemTools::FileExists(tryPath)
-       && !SystemTools::FileIsDirectory(tryPath))
+    if(SystemTools::FileExists(tryPath, true))
       {
       return SystemTools::CollapseFullPath(tryPath);
       }
@@ -3160,8 +3176,7 @@ std::string SystemTools
     tryPath += "lib";
     tryPath += name;
     tryPath += ".dylib";
-    if(SystemTools::FileExists(tryPath)
-       && !SystemTools::FileIsDirectory(tryPath))
+    if(SystemTools::FileExists(tryPath, true))
       {
       return SystemTools::CollapseFullPath(tryPath);
       }
@@ -3169,8 +3184,7 @@ std::string SystemTools
     tryPath += "lib";
     tryPath += name;
     tryPath += ".dll";
-    if(SystemTools::FileExists(tryPath)
-       && !SystemTools::FileIsDirectory(tryPath))
+    if(SystemTools::FileExists(tryPath, true))
       {
       return SystemTools::CollapseFullPath(tryPath);
       }

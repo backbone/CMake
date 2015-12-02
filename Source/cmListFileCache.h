@@ -90,10 +90,8 @@ class cmListFileBacktrace
 {
   public:
     cmListFileBacktrace(cmState::Snapshot snapshot = cmState::Snapshot(),
-                        cmCommandContext const& cc = cmCommandContext())
-      : Context(cc), Snapshot(snapshot)
-    {
-    }
+                        cmCommandContext const& cc = cmCommandContext());
+    ~cmListFileBacktrace();
 
     void PrintTitle(std::ostream& out) const;
     void PrintCallStack(std::ostream& out) const;
@@ -109,15 +107,6 @@ struct cmListFile
                  cmMakefile *mf);
 
   std::vector<cmListFileFunction> Functions;
-};
-
-struct cmValueWithOrigin {
-  cmValueWithOrigin(const std::string &value,
-                          const cmListFileBacktrace &bt)
-    : Value(value), Backtrace(bt)
-  {}
-  std::string Value;
-  cmListFileBacktrace Backtrace;
 };
 
 #endif

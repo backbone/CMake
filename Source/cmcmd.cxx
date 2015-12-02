@@ -35,8 +35,7 @@
 
 #include <stdlib.h> // required for atoi
 #if defined(_WIN32) && defined(CMAKE_BUILD_WITH_CMAKE)
-// defined in binexplib.cxx
-bool DumpFile(const char* filename, FILE *fout);
+#include "bindexplib.h"
 #endif
 
 void CMakeCommandUsage(const char* program)
@@ -240,13 +239,16 @@ int cmcmd::ExecuteCMakeCommand(std::vector<std::string>& args)
         return 1;
         }
       std::string objfile;
+      bindexplib deffile;
       while(cmSystemTools::GetLineFromStream(fin, objfile))
         {
-        if (!DumpFile(objfile.c_str(), fout))
+        if( !deffile.AddObjectFile(objfile.c_str()))
           {
           return 1;
           }
         }
+      deffile.WriteFile(fout);
+      fclose(fout);
       return 0;
       }
 #endif
@@ -765,15 +767,18 @@ int cmcmd::ExecuteCMakeCommand(std::vector<std::string>& args)
       startOutDir = cmSystemTools::CollapseFullPath(startOutDir);
       cm.SetHomeDirectory(homeDir);
       cm.SetHomeOutputDirectory(homeOutDir);
+      cm.GetCurrentSnapshot().SetDefaultDefinitions();
       if(cmGlobalGenerator* ggd = cm.CreateGlobalGenerator(gen))
         {
         cm.SetGlobalGenerator(ggd);
         cmState::Snapshot snapshot = cm.GetCurrentSnapshot();
+        snapshot.GetDirectory().SetCurrentBinary
+          (cmSystemTools::GetCurrentWorkingDirectory());
+        snapshot.GetDirectory().SetCurrentSource
+          (cmSystemTools::GetCurrentWorkingDirectory());
         cmsys::auto_ptr<cmMakefile> mf(new cmMakefile(ggd, snapshot));
         cmsys::auto_ptr<cmLocalGenerator> lgd(
               ggd->CreateLocalGenerator(mf.get()));
-        lgd->GetMakefile()->SetCurrentSourceDirectory(startDir);
-        lgd->GetMakefile()->SetCurrentBinaryDirectory(startOutDir);
 
         // Actually scan dependencies.
         return lgd->UpdateDependencies(depInfo.c_str(),
@@ -1550,7 +1555,6 @@ bool cmVSLink::Parse(std::vector<std::string>::const_iterator argBeg,
     // pass it to the link command.
     this->ManifestFileRC = intDir + "/manifest.rc";
     this->ManifestFileRes = intDir + "/manifest.res";
-    this->LinkCommand.push_back(this->ManifestFileRes);
     }
   else if (this->UserManifests.empty())
     {
@@ -1657,6 +1661,9 @@ int cmVSLink::LinkIncremental()
     {
     return -1;
     }
+
+  // Tell the linker to use our manifest compiled into a resource.
+  this->LinkCommand.push_back(this->ManifestFileRes);
 
   // Run the link command (possibly generates intermediate manifest).
   if (!RunCommand("LINK Pass 1", this->LinkCommand, this->Verbose))

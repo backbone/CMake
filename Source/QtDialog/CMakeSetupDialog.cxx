@@ -33,6 +33,8 @@
 #include "QCMakeCacheView.h"
 #include "AddCacheEntry.h"
 #include "FirstConfigure.h"
+#include "RegexExplorer.h"
+#include "WarningMessagesDialog.h"
 #include "cmSystemTools.h"
 #include "cmVersion.h"
 
@@ -125,6 +127,9 @@ CMakeSetupDialog::CMakeSetupDialog()
                    this, SLOT(doInstallForCommandLine()));
 #endif
   ToolsMenu->addSeparator();
+  ToolsMenu->addAction(tr("Regular Expression Explorer..."),
+                       this, SLOT(doRegexExplorerDialog()));
+  ToolsMenu->addSeparator();
   ToolsMenu->addAction(tr("&Find in Output..."),
                        this, SLOT(doOutputFindDialog()),
                        QKeySequence::Find);
@@ -141,9 +146,8 @@ CMakeSetupDialog::CMakeSetupDialog()
                        this, SLOT(doOutputErrorNext()));  // in Eclipse
 
   QMenu* OptionsMenu = this->menuBar()->addMenu(tr("&Options"));
-  this->SuppressDevWarningsAction =
-    OptionsMenu->addAction(tr("&Suppress dev Warnings (-Wno-dev)"));
-  this->SuppressDevWarningsAction->setCheckable(true);
+  OptionsMenu->addAction(tr("Warning Messages..."),
+                         this, SLOT(doWarningMessagesDialog()));
   this->WarnUninitializedAction =
     OptionsMenu->addAction(tr("&Warn Uninitialized (--warn-uninitialized)"));
   this->WarnUninitializedAction->setCheckable(true);
@@ -273,9 +277,6 @@ void CMakeSetupDialog::initialize()
                    this, SLOT(removeSelectedCacheEntries()));
   QObject::connect(this->AddEntry, SIGNAL(clicked(bool)),
                    this, SLOT(addCacheEntry()));
-
-  QObject::connect(this->SuppressDevWarningsAction, SIGNAL(triggered(bool)),
-                   this->CMakeThread->cmakeInstance(), SLOT(setSuppressDevWarnings(bool)));
 
   QObject::connect(this->WarnUninitializedAction, SIGNAL(triggered(bool)),
                    this->CMakeThread->cmakeInstance(),
@@ -1272,6 +1273,12 @@ void CMakeSetupDialog::doOutputFindDialog()
     }
 }
 
+void CMakeSetupDialog::doRegexExplorerDialog()
+{
+  RegexExplorer dialog(this);
+  dialog.exec();
+}
+
 void CMakeSetupDialog::doOutputFindPrev()
 {
   doOutputFindNext(false);
@@ -1358,4 +1365,10 @@ void CMakeSetupDialog::doOutputErrorNext()
     textCursor.setPosition(textCursor.anchor());
     this->Output->setTextCursor(textCursor);
     }
+}
+
+void CMakeSetupDialog::doWarningMessagesDialog()
+{
+  WarningMessagesDialog dialog(this, this->CMakeThread->cmakeInstance());
+  dialog.exec();
 }

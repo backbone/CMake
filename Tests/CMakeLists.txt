@@ -269,8 +269,7 @@ if(BUILD_TESTING)
     set(TEST_RESOURCES TRUE)
   endif()
   # for borland and watcom there is no resource support
-  if("${CMAKE_GENERATOR}" MATCHES "WMake" OR
-      "${CMAKE_GENERATOR}" MATCHES "Borland")
+  if(WATCOM OR BORLAND)
     set(TEST_RESOURCES FALSE)
   endif()
   if(TEST_RESOURCES)
@@ -686,7 +685,7 @@ ${CMake_BINARY_DIR}/bin/cmake -DDIR=dev -P ${CMake_SOURCE_DIR}/Utilities/Release
   endmacro()
   if(CMAKE_BUILD_NIGHTLY_RELEASES)
     ADD_NIGHTLY_BUILD_TEST(CMakeNightlyWindows
-      dash2win64_release.cmake)
+      dash3win7_release.cmake)
     ADD_NIGHTLY_BUILD_TEST(CMakeNightlyOSX
       dashmacmini5_release.cmake)
     ADD_NIGHTLY_BUILD_TEST(CMakeNightlyLinux32
@@ -1356,15 +1355,36 @@ ${CMake_BINARY_DIR}/bin/cmake -DDIR=dev -P ${CMake_SOURCE_DIR}/Utilities/Release
     endif()
   endif()
 
+  if(CMake_TEST_FindBoost)
+    add_subdirectory(FindBoost)
+  endif()
+
   if(CMake_TEST_FindGSL)
     add_subdirectory(FindGSL)
   endif()
+
+  if(CMake_TEST_FindGTest)
+    add_subdirectory(FindGTest)
+  endif()
+
   if(CMake_TEST_FindJsonCpp)
     add_subdirectory(FindJsonCpp)
   endif()
 
   if(CMake_TEST_FindOpenSSL)
     add_subdirectory(FindOpenSSL)
+  endif()
+
+  if(CMake_TEST_FindPNG)
+    add_subdirectory(FindPNG)
+  endif()
+
+  if(CMake_TEST_FindTIFF)
+    add_subdirectory(FindTIFF)
+  endif()
+
+  if(CMake_TEST_FindXalanC)
+    add_subdirectory(FindXalanC)
   endif()
 
   if(CMake_TEST_FindXercesC)

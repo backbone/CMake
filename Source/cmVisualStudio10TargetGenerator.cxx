@@ -448,6 +448,32 @@ void cmVisualStudio10TargetGenerator::Generate()
     (*this->BuildFileStream) << cmVS10EscapeXML(targetFrameworkVersion)
                              << "</TargetFrameworkVersion>\n";
     }
+
+  std::vector<std::string> keys = this->GeneratorTarget->GetPropertyKeys();
+  for(std::vector<std::string>::const_iterator keyIt = keys.begin();
+      keyIt != keys.end(); ++keyIt)
+    {
+    static const char* prefix = "VS_GLOBAL_";
+    if(keyIt->find(prefix) != 0)
+      continue;
+    std::string globalKey = keyIt->substr(strlen(prefix));
+    // Skip invalid or separately-handled properties.
+    if(globalKey == "" ||
+       globalKey == "PROJECT_TYPES" ||
+       globalKey == "ROOTNAMESPACE" ||
+       globalKey == "KEYWORD")
+      {
+      continue;
+      }
+    const char* value = this->GeneratorTarget->GetProperty(keyIt->c_str());
+    if (!value)
+      continue;
+    this->WriteString("<", 2);
+    (*this->BuildFileStream) << globalKey << ">"
+                             << cmVS10EscapeXML(value)
+                             << "</" << globalKey << ">\n";
+    }
+
   this->WriteString("</PropertyGroup>\n", 1);
   this->WriteString("<Import Project="
                     "\"$(VCTargetsPath)\\Microsoft.Cpp.Default.props\" />\n",
@@ -736,13 +762,16 @@ void cmVisualStudio10TargetGenerator
   std::string mfcFlagValue = mfcFlag ? mfcFlag : "0";
 
   std::string useOfMfcValue = "false";
-  if(mfcFlagValue == "1")
+  if(this->GeneratorTarget->GetType() <= cmState::OBJECT_LIBRARY)
     {
-    useOfMfcValue = "Static";
-    }
-  else if(mfcFlagValue == "2")
-    {
-    useOfMfcValue = "Dynamic";
+    if(mfcFlagValue == "1")
+      {
+      useOfMfcValue = "Static";
+      }
+    else if(mfcFlagValue == "2")
+      {
+      useOfMfcValue = "Dynamic";
+      }
     }
   std::string mfcLine = "<UseOfMfc>";
   mfcLine += useOfMfcValue + "</UseOfMfc>\n";
@@ -2597,14 +2626,16 @@ cmVisualStudio10TargetGenerator::ComputeLinkOptions(std::string const& config)
       linkOptions.AddFlag("StackReserveSize", stackVal);
       }
 
-    if(linkOptions.IsDebug() || flags.find("/debug") != flags.npos)
+    if (this->LocalGenerator->GetVersion() >=
+        cmGlobalVisualStudioGenerator::VS14)
       {
-      linkOptions.AddFlag("GenerateDebugInformation", "true");
+      linkOptions.AddFlag("GenerateDebugInformation", "No");
       }
     else
       {
       linkOptions.AddFlag("GenerateDebugInformation", "false");
       }
+
     std::string pdb = this->GeneratorTarget->GetPDBDirectory(config.c_str());
     pdb += "/";
     pdb += targetNamePDB;
@@ -2664,6 +2695,34 @@ cmVisualStudio10TargetGenerator::ComputeLinkOptions(std::string const& config)
     if (this->GeneratorTarget->GetPropertyAsBool("WINDOWS_EXPORT_ALL_SYMBOLS"))
       {
       linkOptions.AddFlag("ModuleDefinitionFile", "$(IntDir)exportall.def");
+      }
+    }
+
+  // Hack to fix flag version selection in a common use case.
+  // FIXME: Select flag table based on toolset instead of VS version.
+  if (this->LocalGenerator->GetVersion() >=
+      cmGlobalVisualStudioGenerator::VS14)
+    {
+    cmGlobalVisualStudio10Generator* gg =
+      static_cast<cmGlobalVisualStudio10Generator*>(this->GlobalGenerator);
+    const char* toolset = gg->GetPlatformToolset();
+    if (toolset &&
+        (cmHasLiteralPrefix(toolset, "v100") ||
+         cmHasLiteralPrefix(toolset, "v110") ||
+         cmHasLiteralPrefix(toolset, "v120")))
+      {
+      if (const char* debug = linkOptions.GetFlag("GenerateDebugInformation"))
+        {
+        // Convert value from enumeration back to boolean for older toolsets.
+        if (strcmp(debug, "No") == 0)
+          {
+          linkOptions.AddFlag("GenerateDebugInformation", "false");
+          }
+        else if (strcmp(debug, "Debug") == 0)
+          {
+          linkOptions.AddFlag("GenerateDebugInformation", "true");
+          }
+        }
       }
     }
 

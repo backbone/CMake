@@ -152,13 +152,19 @@ void cmInstallTargetGenerator::GenerateScriptForConfig(std::ostream& os,
       // Handle OSX Bundles.
       if(this->Target->IsAppBundleOnApple())
         {
+        cmMakefile const* mf = this->Target->Target->GetMakefile();
+
         // Install the whole app bundle directory.
         type = cmInstallType_DIRECTORY;
         literal_args += " USE_SOURCE_PERMISSIONS";
         from1 += ".app";
 
         // Tweaks apply to the binary inside the bundle.
-        to1 += ".app/Contents/MacOS/";
+        to1 += ".app/";
+        if(!mf->PlatformIsAppleIos())
+          {
+          to1 += "Contents/MacOS/";
+          }
         to1 += targetName;
         }
       else
@@ -525,6 +531,7 @@ void cmInstallTargetGenerator::PostReplacementTweaks(std::ostream& os,
 {
   this->AddInstallNamePatchRule(os, indent, config, file);
   this->AddChrpathPatchRule(os, indent, config, file);
+  this->AddUniversalInstallRule(os, indent, file);
   this->AddRanlibRule(os, indent, file);
   this->AddStripRule(os, indent, file);
 }
@@ -784,18 +791,10 @@ cmInstallTargetGenerator
       }
 
     // Write a rule to run chrpath to set the install-tree RPATH
-    if(newRpath.empty())
-      {
-      os << indent << "file(RPATH_REMOVE\n"
-         << indent << "     FILE \"" << toDestDirPath << "\")\n";
-      }
-    else
-      {
-      os << indent << "file(RPATH_CHANGE\n"
-         << indent << "     FILE \"" << toDestDirPath << "\"\n"
-         << indent << "     OLD_RPATH \"" << oldRpath << "\"\n"
-         << indent << "     NEW_RPATH \"" << newRpath << "\")\n";
-      }
+    os << indent << "file(RPATH_CHANGE\n"
+       << indent << "     FILE \"" << toDestDirPath << "\"\n"
+       << indent << "     OLD_RPATH \"" << oldRpath << "\"\n"
+       << indent << "     NEW_RPATH \"" << newRpath << "\")\n";
     }
 }
 
@@ -860,4 +859,47 @@ cmInstallTargetGenerator::AddRanlibRule(std::ostream& os,
 
   os << indent << "execute_process(COMMAND \""
      << ranlib << "\" \"" << toDestDirPath << "\")\n";
+}
+
+//----------------------------------------------------------------------------
+void
+cmInstallTargetGenerator
+::AddUniversalInstallRule(std::ostream& os,
+                          Indent const& indent,
+                          const std::string& toDestDirPath)
+{
+  cmMakefile const* mf = this->Target->Target->GetMakefile();
+
+  if(!mf->PlatformIsAppleIos() || !mf->IsOn("XCODE"))
+    {
+    return;
+    }
+
+  const char* xcodeVersion = mf->GetDefinition("XCODE_VERSION");
+  if(!xcodeVersion || cmSystemTools::VersionCompareGreater("6", xcodeVersion))
+    {
+    return;
+    }
+
+  switch(this->Target->GetType())
+    {
+    case cmState::EXECUTABLE:
+    case cmState::STATIC_LIBRARY:
+    case cmState::SHARED_LIBRARY:
+    case cmState::MODULE_LIBRARY:
+      break;
+
+    default:
+      return;
+    }
+
+  if(!this->Target->Target->GetPropertyAsBool("IOS_INSTALL_COMBINED"))
+   {
+   return;
+   }
+
+  os << indent << "include(CMakeIOSInstallCombined)\n";
+  os << indent << "ios_install_combined("
+               << "\"" << this->Target->Target->GetName() << "\" "
+               << "\"" << toDestDirPath << "\")\n";
 }
